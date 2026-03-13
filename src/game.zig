@@ -8,18 +8,27 @@ const Grid = level.Grid;
 
 const camera_move_speed = 660;
 
+var WINDOW_WIDTH: i32 = 1400;
+var WINDOW_HEIGHT: i32 = 800;
+
+pub const Config = struct {
+	window_width: i32,
+	window_height: i32,
+};
+
+const GameMode = enum {
+	title_screen,
+	gameplay
+};
+
 const State = struct {
+	gamemode: GameMode = .title_screen,
 	grid: level.Grid,
 	camera: rl.Camera2D,
 
-	pub fn init(allocator: std.mem.Allocator)  !State {
-		const config: level.WorldConfig = .{
-			.width = 200,
-			.height = 80
-		};
-
+	pub fn init(world_config: level.WorldConfig, allocator: std.mem.Allocator)  !State {
 		return .{
-			.grid = try level.getRandomLevel(config, allocator),
+			.grid = try level.getRandomLevel(world_config, allocator),
 			.camera = .{
 				.offset = .init(0, 0),
 				.rotation = 0,
@@ -84,43 +93,78 @@ fn handleTilePlacing(state: *State) !void {
 	}
 }
 
-pub fn runGameLoop(allocator: std.mem.Allocator) !void {
-	var seed: u64 = 0;
-	try std.posix.getrandom(std.mem.asBytes(&seed));
+fn updateGameplay(state: *State, delta_time: f32) !void {
+	try handleTilePlacing(state);
+	handleCameraMovement(&state.camera, delta_time);
+}
 
-	var state = try State.init(allocator);
+fn drawGameplay(state: *State, spritesheet: rl.Texture2D) !void {
+	// Drawing
+	rl.beginDrawing();
+	defer rl.endDrawing();
+
+	rl.clearBackground(.sky_blue);
+	rl.beginMode2D(state.camera);
+
+	try level.drawGrid(&state.grid, spritesheet);
+	rl.endMode2D();
+
+	// Fixed Drawing
+	try printInfo(state);
+}
+
+fn drawTitleScreen() void {
+	rl.beginDrawing();
+	defer rl.endDrawing();
+
+	rl.clearBackground(.sky_blue);
+	rl.drawText(
+		"Terraria",
+		@divFloor(WINDOW_WIDTH, 2),
+		@divFloor(WINDOW_HEIGHT, 2),
+		40,
+		.white
+	);
+}
+
+pub fn runGameLoop(allocator: std.mem.Allocator) !void {
+	const world_config: level.WorldConfig = .{
+		.width = 300,
+		.height = 64,
+	};
+	var state = try State.init(world_config, allocator);
 	const spritesheet = try rl.loadTexture("assets/dirt.png");
-	try state.grid.placeTile(0, 0, .dirt);
-	try state.grid.placeTile(2, 1, .dirt);
 
 	while (!rl.windowShouldClose()) {
 		const delta_time = rl.getFrameTime();
+		if (rl.getKeyPressed()  != .null) state.gamemode = .gameplay;
+		switch (state.gamemode) {
+			.gameplay => {
+				try updateGameplay(&state, delta_time);
+				try drawGameplay(&state, spritesheet);
+			},
+			.title_screen => {
+				try updateGameplay(&state, delta_time);
+				drawTitleScreen();
+			}
+		}
 
-		try handleTilePlacing(&state);
-		handleCameraMovement(&state.camera, delta_time);
-
-		// Drawing
-		rl.beginDrawing();
-		defer rl.endDrawing();
-
-		rl.clearBackground(.sky_blue);
-		rl.beginMode2D(state.camera);
-
-		try level.drawGrid(&state.grid, spritesheet);
-		rl.endMode2D();
-
-		// Fixed Drawing
-		try printInfo(&state);
 	}
 }
 
-pub fn run(window_width: i32, window_height: i32) !void {
-	rl.initWindow(window_width, window_height, "Hello, world!");
+pub fn run(config: ?Config) !void { // TODO: Maybe clean this up
+	const c = config orelse Config{
+		.window_width = 1400,
+		.window_height = 800
+	};
+	WINDOW_WIDTH = c.window_width;
+	WINDOW_HEIGHT= c.window_height;
+	rl.initWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "Hello, world!");
 	defer rl.closeWindow();
+	if (!rl.isWindowReady()) return error.InitWindow;
 
 	var debug_allocator = std.heap.DebugAllocator(.{}).init;
 	const allocator = debug_allocator.allocator();
 
-	if (!rl.isWindowReady()) {return error.InitWindow;}
 	try runGameLoop(allocator);
 }
