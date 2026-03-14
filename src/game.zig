@@ -33,7 +33,10 @@ const State = struct {
 		return .{
 			.grid = try level.getRandomLevel(world_config, allocator),
 			.camera = .{
-				.offset = .init(0, 0),
+				.offset = .init(
+					@divFloor(@as(f32, @floatFromInt(WINDOW_WIDTH)),2),
+					@divFloor(@as(f32, @floatFromInt(WINDOW_HEIGHT)),2),
+				),
 				.rotation = 0,
 				.target = .init(0, 0),
 				.zoom = 1
@@ -81,15 +84,18 @@ fn printInfo(state: *const State) !void {
 	_=rgui.statusBar(rect, string);
 }
 
-fn handleCameraMovement(camera: *rl.Camera2D, delta_time: f32) void {
+fn updateCamera(camera: *rl.Camera2D, delta_time: f32) void {
 	if (rl.isKeyDown(.a)) camera.target.x -= camera_move_speed*delta_time;
 	if (rl.isKeyDown(.w)) camera.target.y -= camera_move_speed*delta_time;
 	if (rl.isKeyDown(.d)) camera.target.x += camera_move_speed*delta_time;
 	if (rl.isKeyDown(.s)) camera.target.y += camera_move_speed*delta_time;
+
+	const delta = rl.getMouseWheelMove();
+	camera.zoom += delta * 0.4 * camera.zoom;
 }
 
 fn handleTilePlacing(state: *State) !void {
-	if (rl.isMouseButtonPressed(.left)) {
+	if (rl.isMouseButtonDown(.left)) {
 		const mouse_grid_position = getMouseGridPosition(state.grid, state.camera);
 		const x: u64 = @intFromFloat(mouse_grid_position.x);
 		const y: u64 = @intFromFloat(mouse_grid_position.y);
@@ -99,7 +105,7 @@ fn handleTilePlacing(state: *State) !void {
 
 fn updateGameplay(state: *State, delta_time: f32) !void {
 	try handleTilePlacing(state);
-	handleCameraMovement(&state.camera, delta_time);
+	updateCamera(&state.camera, delta_time);
 }
 
 fn drawGameplay(state: *State, spritesheet: rl.Texture2D) !void {
@@ -115,6 +121,7 @@ fn drawGameplay(state: *State, spritesheet: rl.Texture2D) !void {
 
 	// Fixed Drawing
 	try printInfo(state);
+	rl.drawFPS(10, 100);
 }
 
 pub fn runGameLoop(allocator: std.mem.Allocator) !void {
