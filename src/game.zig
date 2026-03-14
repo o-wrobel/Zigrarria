@@ -55,29 +55,30 @@ fn printInfo(state: *const State) !void {
 		state.grid,
 		rl.getMousePosition(),
 		state.camera
-	).clamp(.init(0, 0), .init(63, 63));
+	).clamp(
+		.init(0, 0),
+		.init(
+			@floatFromInt(state.grid.width-1),
+			@floatFromInt(state.grid.height-1)
+		)
+	);
 	var buffer: [128]u8 = undefined;
 	const string = try std.fmt.bufPrintZ(
 		&buffer,
-		"{}, {}, {s}\n",
+		"{s}, {}, {}",
 		.{
-			mouse_grid_position.x,
-			mouse_grid_position.y,
 			@tagName(
 				state.grid.tileAt(
 					@intFromFloat(mouse_grid_position.x),
 					@intFromFloat(mouse_grid_position.y)
 				) catch .none
-			)
+			),
+			mouse_grid_position.x,
+			mouse_grid_position.y,
 		}
 	);
-	rl.drawText(
-		string,
-		10,
-		280,
-		18,
-		.white
-	);
+	const rect: rl.Rectangle = .init(10, 10, 100, 20);
+	_=rgui.statusBar(rect, string);
 }
 
 fn handleCameraMovement(camera: *rl.Camera2D, delta_time: f32) void {
