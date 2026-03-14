@@ -1,8 +1,10 @@
 const std = @import("std");
 
 const rl = @import("raylib");
+const rgui = @import("raygui");
 const znoise = @import("znoise");
 
+const title_screen = @import("title_screen.zig");
 const level = @import("level.zig");
 const Grid = level.Grid;
 
@@ -10,6 +12,7 @@ const camera_move_speed = 660;
 
 var WINDOW_WIDTH: i32 = 1400;
 var WINDOW_HEIGHT: i32 = 800;
+
 
 pub const Config = struct {
 	window_width: i32,
@@ -113,20 +116,6 @@ fn drawGameplay(state: *State, spritesheet: rl.Texture2D) !void {
 	try printInfo(state);
 }
 
-fn drawTitleScreen() void {
-	rl.beginDrawing();
-	defer rl.endDrawing();
-
-	rl.clearBackground(.sky_blue);
-	rl.drawText(
-		"Terraria",
-		@divFloor(WINDOW_WIDTH, 2),
-		@divFloor(WINDOW_HEIGHT, 2),
-		40,
-		.white
-	);
-}
-
 pub fn runGameLoop(allocator: std.mem.Allocator) !void {
 	const world_config: level.WorldConfig = .{
 		.width = 300,
@@ -137,7 +126,6 @@ pub fn runGameLoop(allocator: std.mem.Allocator) !void {
 
 	while (!rl.windowShouldClose()) {
 		const delta_time = rl.getFrameTime();
-		if (rl.getKeyPressed()  != .null) state.gamemode = .gameplay;
 		switch (state.gamemode) {
 			.gameplay => {
 				try updateGameplay(&state, delta_time);
@@ -145,7 +133,9 @@ pub fn runGameLoop(allocator: std.mem.Allocator) !void {
 			},
 			.title_screen => {
 				try updateGameplay(&state, delta_time);
-				drawTitleScreen();
+				if (title_screen.draw()) { //TODO: FIgure out how to somehow separate the logic from drawing
+					state.gamemode = .gameplay;
+				}
 			}
 		}
 
