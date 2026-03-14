@@ -1,8 +1,9 @@
 const std = @import("std");
 const rl = @import("raylib");
 const znoise = @import("znoise");
-const tgen = @import("terrain_generation.zig");
 
+const helper = @import("helper.zig");
+const tgen = @import("terrain_generation.zig");
 pub const Grid = @import("Grid.zig");
 
 const TILE_SIZE = 8;
@@ -79,15 +80,42 @@ fn getTextureRect(grid: *const Grid, x: u64, y: u64) !rl.Rectangle {
 	return source_rect;
 }
 
-pub fn drawGrid(grid: *const Grid, spritesheet: rl.Texture2D) !void {
+pub fn getMouseGridPosition(grid: *const Grid, camera: rl.Camera2D) rl.Vector2 {
+	const mouse_world_position = rl.getScreenToWorld2D(rl.getMousePosition(), camera);
+	return getGridPosition(
+		grid,
+		mouse_world_position,
+	).clamp(.init(0, 0), .init(@floatFromInt(grid.width-1), @floatFromInt(grid.height-1)));
+}
+
+
+fn getCameraGridBounds(camera: rl.Camera2D, grid: *const Grid) struct{rl.Vector2, rl.Vector2} {
+	const bounds = helper.getCameraBounds(camera);
+	const top_left = getGridPosition(grid, bounds[0]);
+	const bottom_right = getGridPosition(grid, bounds[1]); //TODO: handle inverted coordinates
+
+	return .{top_left, bottom_right};
+}
+
+pub fn drawGrid(grid: *const Grid, camera: rl.Camera2D, spritesheet: rl.Texture2D) !void {
+	const clamp = std.math.clamp;
+	const bounds = getCameraGridBounds(camera, grid);
+
+	const x0: u64 = @intFromFloat(clamp(bounds[0].x, 0, @as(f32, @floatFromInt(grid.width-1))));
+	const y0: u64 = @intFromFloat(clamp(bounds[0].y, 0, @as(f32, @floatFromInt(grid.height-1))));
+	const xe: u64 = @intFromFloat(clamp(bounds[1].x, 0, @as(f32, @floatFromInt(grid.width-1))));
+	const ye: u64 = @intFromFloat(clamp(bounds[1].y, 0, @as(f32, @floatFromInt(grid.height-1))));
+	// std.debug.print("grid: {} {} ||| {}, {}\n", .{x0, y0, xe, ye});
+
 	var dest_rect: rl.Rectangle = .{
 		.width = 8,
 		.height = 8,
 		.x = undefined,
 		.y = undefined
 	};
-	for (0..grid.height-1) |y| {
-		for (0..grid.width-1) |x| {
+
+	for (ye..y0) |y| { // IMPORANT: Goes from bottom to top
+		for (x0..xe+1) |x| { // Left to right
 			const yf: f32 = @floatFromInt(y);
 			const xf: f32 = @floatFromInt(x);
 			dest_rect.x = xf*TILE_SIZE;
@@ -109,10 +137,9 @@ pub fn getRandomLevel(config: WorldConfig, allocator: std.mem.Allocator) !Grid {
 	return try tgen.newTerrain(config.width, config.height, seed, allocator);
 }
 
-pub fn getGridPosition(grid: Grid, pos: rl.Vector2, camera: rl.Camera2D) rl.Vector2 {
-	const pos2 = rl.getScreenToWorld2D(pos, camera);
+pub fn getGridPosition(grid: *const Grid, pos: rl.Vector2) rl.Vector2 {
 	return .init(
-		@divFloor(pos2.x, TILE_SIZE),
-		@as(f32, @floatFromInt(grid.height)) - @divFloor(pos2.y, TILE_SIZE),
+		@divFloor(pos.x, TILE_SIZE),
+		@as(f32, @floatFromInt(grid.height)) - @divFloor(pos.y, TILE_SIZE),
 	);
 }

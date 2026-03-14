@@ -4,6 +4,7 @@ const rl = @import("raylib");
 const rgui = @import("raygui");
 const znoise = @import("znoise");
 
+const helper = @import("helper.zig");
 const title_screen = @import("title_screen.zig");
 const level = @import("level.zig");
 const Grid = level.Grid;
@@ -45,26 +46,9 @@ const State = struct {
 	}
 };
 
-fn getMouseGridPosition(grid: Grid, camera: rl.Camera2D) rl.Vector2 {
-	return level.getGridPosition(
-		grid,
-		rl.getMousePosition(),
-		camera
-	).clamp(.init(0, 0), .init(@floatFromInt(grid.width-1), @floatFromInt(grid.height-1)));
-}
 
 fn printInfo(state: *const State) !void {
-	const mouse_grid_position = level.getGridPosition(
-		state.grid,
-		rl.getMousePosition(),
-		state.camera
-	).clamp(
-		.init(0, 0),
-		.init(
-			@floatFromInt(state.grid.width-1),
-			@floatFromInt(state.grid.height-1)
-		)
-	);
+	const mouse_grid_position = level.getMouseGridPosition(&state.grid, state.camera);
 	var buffer: [128]u8 = undefined;
 	const string = try std.fmt.bufPrintZ(
 		&buffer,
@@ -96,7 +80,7 @@ fn updateCamera(camera: *rl.Camera2D, delta_time: f32) void {
 
 fn handleTilePlacing(state: *State) !void {
 	if (rl.isMouseButtonDown(.left)) {
-		const mouse_grid_position = getMouseGridPosition(state.grid, state.camera);
+		const mouse_grid_position = level.getMouseGridPosition(&state.grid, state.camera);
 		const x: u64 = @intFromFloat(mouse_grid_position.x);
 		const y: u64 = @intFromFloat(mouse_grid_position.y);
 		try state.grid.placeTile(x, y, .dirt);
@@ -116,7 +100,7 @@ fn drawGameplay(state: *State, spritesheet: rl.Texture2D) !void {
 	rl.clearBackground(.sky_blue);
 	rl.beginMode2D(state.camera);
 
-	try level.drawGrid(&state.grid, spritesheet);
+	try level.drawGrid(&state.grid, state.camera, spritesheet);
 	rl.endMode2D();
 
 	// Fixed Drawing
