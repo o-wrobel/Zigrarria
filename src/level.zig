@@ -5,6 +5,7 @@ const znoise = @import("znoise");
 const helper = @import("helper.zig");
 const tgen = @import("terrain_generation.zig");
 pub const Grid = @import("Grid.zig");
+const Bitmap = []u4;
 
 const TILE_SIZE = 8;
 const TILE_TEXTURE_SIZE = 9*2;
@@ -38,7 +39,8 @@ const Facing = packed struct {
 	}
 };
 
-fn checkNeighborsAt(grid: *const Grid, x: u64, y: u64) !Facing {
+// GRID DRAWING
+pub fn checkNeighborsAt(grid: *const Grid, x: u64, y: u64) !Facing {
 	if (x == 0 or x == grid.width-1 or y == 0 or y == grid.height-1) return .{
 		.r = false,
 		.b = false,
@@ -53,7 +55,7 @@ fn checkNeighborsAt(grid: *const Grid, x: u64, y: u64) !Facing {
 	};
 }
 
-fn getTextureRect(grid: *const Grid, x: u64, y: u64) !rl.Rectangle {
+fn getTextureRect(grid: *const Grid, bitmap: Bitmap, x: u64, y: u64) !rl.Rectangle {
 	var source_rect: rl.Rectangle = .{
 		.width = TILE_SIZE,
 		.height = TILE_SIZE,
@@ -62,9 +64,6 @@ fn getTextureRect(grid: *const Grid, x: u64, y: u64) !rl.Rectangle {
 	};
 
 	const tile = try grid.tileAt(x, y);
-	const yf: f32 = @floatFromInt(y);
-	const xf: f32 = @floatFromInt(x);
-	_ = xf; _ = yf;
 
 	switch (tile) {
 		.none => {
@@ -75,29 +74,44 @@ fn getTextureRect(grid: *const Grid, x: u64, y: u64) !rl.Rectangle {
 		}
 	}
 
-	const coords = (try checkNeighborsAt(grid, x, y)).toInt();
-	source_rect.x = @floatFromInt(@as(u64, @intCast(coords))*TILE_SIZE);
+	const grid_index = x + y*grid.width;
+	// const x_index = (try checkNeighborsAt(grid, x, y)).toInt();
+	const x_index = bitmap[grid_index];
+	source_rect.x = @floatFromInt(@as(u64, @intCast(x_index))*TILE_SIZE);
 	return source_rect;
 }
 
-pub fn getMouseGridPosition(grid: *const Grid, camera: rl.Camera2D) rl.Vector2 {
-	const mouse_world_position = rl.getScreenToWorld2D(rl.getMousePosition(), camera);
-	return getGridPosition(
-		grid,
-		mouse_world_position,
-	).clamp(.init(0, 0), .init(@floatFromInt(grid.width-1), @floatFromInt(grid.height-1)));
+fn getTextureRectModifiedBitmap(grid: *const Grid, bitmap: Bitmap, x: u64, y: u64) !rl.Rectangle {
+	var source_rect: rl.Rectangle = .{
+		.width = TILE_SIZE,
+		.height = TILE_SIZE,
+		.x = 0,
+		.y = 0,
+	};
+
+	const tile = try grid.tileAt(x, y);
+
+	switch (tile) {
+		.none => {
+			source_rect.y = 0;
+		},
+		else => {
+			source_rect.y = TILE_SIZE;
+		}
+	}
+
+	const grid_index = x + y*grid.width;
+	// const x_index = (try checkNeighborsAt(grid, x, y)).toInt();
+	bitmap[grid_index] = (try checkNeighborsAt(grid, x, y)).toInt();
+	const x_index = bitmap[grid_index];
+	source_rect.x = @floatFromInt(@as(u64, @intCast(x_index))*TILE_SIZE);
+	return source_rect;
 }
 
-
-fn getCameraGridBounds(camera: rl.Camera2D, grid: *const Grid) struct{rl.Vector2, rl.Vector2} {
-	const bounds = helper.getCameraBounds(camera);
-	const top_left = getGridPosition(grid, bounds[0]);
-	const bottom_right = getGridPosition(grid, bounds[1]); //TODO: handle inverted coordinates
-
-	return .{top_left, bottom_right};
-}
-
-pub fn drawGrid(grid: *const Grid, camera: rl.Camera2D, spritesheet: rl.Texture2D) !void {
+// TODO: Bitmap modification halves the FPS. Implement lazier method
+// TODO: Bitmap only changes for tiles in screen range on startup
+// TODO: Fix seams inbetween tiles at random camera positions
+pub fn drawGrid(grid: *const Grid, bitmap: Bitmap, bitmap_was_modified: bool, camera: rl.Camera2D, spritesheet: rl.Texture2D) !void {
 	const clamp = std.math.clamp;
 	const bounds = getCameraGridBounds(camera, grid);
 
@@ -114,18 +128,56 @@ pub fn drawGrid(grid: *const Grid, camera: rl.Camera2D, spritesheet: rl.Texture2
 		.y = undefined
 	};
 
-	for (ye..y0) |y| { // IMPORANT: Goes from bottom to top
-		for (x0..xe+1) |x| { // Left to right
-			const yf: f32 = @floatFromInt(y);
-			const xf: f32 = @floatFromInt(x);
-			dest_rect.x = xf*TILE_SIZE;
-			dest_rect.y = (@as(f32, @floatFromInt(grid.height)) - yf)*TILE_SIZE;
-			const source_rect = try getTextureRect(grid, x, y);
-			rl.drawTexturePro(spritesheet, source_rect, dest_rect, .init(0, 0), 0, .white);
+	if (bitmap_was_modified) {
+		for (ye..y0) |y| { // IMPORANT: Goes from bottom to top
+			for (x0..xe+1) |x| { // Left to right
+				const yf: f32 = @floatFromInt(y);
+				const xf: f32 = @floatFromInt(x);
+				dest_rect.x = xf*TILE_SIZE;
+				dest_rect.y = (@as(f32, @floatFromInt(grid.height)) - yf)*TILE_SIZE;
+				const source_rect = try getTextureRectModifiedBitmap(grid, bitmap, x, y);
+				rl.drawTexturePro(spritesheet, source_rect, dest_rect, .init(0, 0), 0, .white);
+			}
+		}
+	} else {
+		for (ye..y0) |y| { // IMPORANT: Goes from bottom to top
+			for (x0..xe+1) |x| { // Left to right
+				const yf: f32 = @floatFromInt(y);
+				const xf: f32 = @floatFromInt(x);
+				dest_rect.x = xf*TILE_SIZE;
+				dest_rect.y = (@as(f32, @floatFromInt(grid.height)) - yf)*TILE_SIZE;
+				const source_rect = try getTextureRect(grid, bitmap, x, y);
+				rl.drawTexturePro(spritesheet, source_rect, dest_rect, .init(0, 0), 0, .white);
+			}
 		}
 	}
 }
 
+// HELPER FUNCTIONS
+pub fn getMouseGridPosition(grid: *const Grid, camera: rl.Camera2D) rl.Vector2 {
+	const mouse_world_position = rl.getScreenToWorld2D(rl.getMousePosition(), camera);
+	return getGridPosition(
+		grid,
+		mouse_world_position,
+	).clamp(.init(0, 0), .init(@floatFromInt(grid.width-1), @floatFromInt(grid.height-1)));
+}
+
+fn getCameraGridBounds(camera: rl.Camera2D, grid: *const Grid) struct{rl.Vector2, rl.Vector2} {
+	const bounds = helper.getCameraBounds(camera);
+	const top_left = getGridPosition(grid, bounds[0]);
+	const bottom_right = getGridPosition(grid, bounds[1]); //TODO: handle inverted coordinates
+
+	return .{top_left, bottom_right};
+}
+
+pub fn getGridPosition(grid: *const Grid, pos: rl.Vector2) rl.Vector2 {
+	return .init(
+		@divFloor(pos.x, TILE_SIZE),
+		@as(f32, @floatFromInt(grid.height)) - @divFloor(pos.y, TILE_SIZE),
+	);
+}
+
+// OTHER FUNCTIONS
 pub fn getRandomLevel(config: WorldConfig, allocator: std.mem.Allocator) !Grid {
 	var seed: u64 = undefined;
 	if (config.seed) |s| {
@@ -135,11 +187,4 @@ pub fn getRandomLevel(config: WorldConfig, allocator: std.mem.Allocator) !Grid {
 	}
 
 	return try tgen.newTerrain(config.width, config.height, seed, allocator);
-}
-
-pub fn getGridPosition(grid: *const Grid, pos: rl.Vector2) rl.Vector2 {
-	return .init(
-		@divFloor(pos.x, TILE_SIZE),
-		@as(f32, @floatFromInt(grid.height)) - @divFloor(pos.y, TILE_SIZE),
-	);
 }

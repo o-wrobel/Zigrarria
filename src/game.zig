@@ -8,6 +8,7 @@ const helper = @import("helper.zig");
 const title_screen = @import("title_screen.zig");
 const level = @import("level.zig");
 const Grid = level.Grid;
+const Bitmap = []u4;
 
 const camera_move_speed = 660;
 
@@ -29,6 +30,7 @@ const State = struct {
 	gamemode: GameMode = .title_screen,
 	grid: level.Grid,
 	camera: rl.Camera2D,
+	modified_world: bool = true,
 
 	pub fn init(world_config: level.WorldConfig, allocator: std.mem.Allocator)  !State {
 		return .{
@@ -41,11 +43,10 @@ const State = struct {
 				.rotation = 0,
 				.target = .init(0, 0),
 				.zoom = 1
-			}
+			},
 		};
 	}
 };
-
 
 fn printInfo(state: *const State) !void {
 	const mouse_grid_position = level.getMouseGridPosition(&state.grid, state.camera);
@@ -78,21 +79,24 @@ fn updateCamera(camera: *rl.Camera2D, delta_time: f32) void {
 	camera.zoom += delta * 0.4 * camera.zoom;
 }
 
-fn handleTilePlacing(state: *State) !void {
+fn handleTilePlacing(state: *State) !bool {
 	if (rl.isMouseButtonDown(.left)) {
 		const mouse_grid_position = level.getMouseGridPosition(&state.grid, state.camera);
 		const x: u64 = @intFromFloat(mouse_grid_position.x);
 		const y: u64 = @intFromFloat(mouse_grid_position.y);
 		try state.grid.placeTile(x, y, .dirt);
+		return true;
 	}
+	return false;
 }
 
 fn updateGameplay(state: *State, delta_time: f32) !void {
-	try handleTilePlacing(state);
+	state.modified_world = try handleTilePlacing(state);
+
 	updateCamera(&state.camera, delta_time);
 }
 
-fn drawGameplay(state: *State, spritesheet: rl.Texture2D) !void {
+fn drawGameplay(state: *State, bitmap: Bitmap, spritesheet: rl.Texture2D) !void {
 	// Drawing
 	rl.beginDrawing();
 	defer rl.endDrawing();
@@ -100,7 +104,7 @@ fn drawGameplay(state: *State, spritesheet: rl.Texture2D) !void {
 	rl.clearBackground(.sky_blue);
 	rl.beginMode2D(state.camera);
 
-	try level.drawGrid(&state.grid, state.camera, spritesheet);
+	try level.drawGrid(&state.grid, bitmap, state.modified_world, state.camera, spritesheet);
 	rl.endMode2D();
 
 	// Fixed Drawing
@@ -116,12 +120,15 @@ pub fn runGameLoop(allocator: std.mem.Allocator) !void {
 	var state = try State.init(world_config, allocator);
 	const spritesheet = try rl.loadTexture("assets/dirt.png");
 
+	const bitmap = try allocator.alloc(u4, state.grid.width*state.grid.height);
+	defer allocator.free(bitmap);
+
 	while (!rl.windowShouldClose()) {
 		const delta_time = rl.getFrameTime();
 		switch (state.gamemode) {
 			.gameplay => {
 				try updateGameplay(&state, delta_time);
-				try drawGameplay(&state, spritesheet);
+				try drawGameplay(&state, bitmap, spritesheet);
 			},
 			.title_screen => {
 				try updateGameplay(&state, delta_time);
