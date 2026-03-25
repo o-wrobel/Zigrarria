@@ -27,8 +27,7 @@ pub fn newTerrain(width: u64, height: u64, seed: u64, allocator: std.mem.Allocat
 		const h = terrainHeight(x, gen);
 		for (0..grid.height-1) |y| {
 			if (y < h) {
-				const tile = try grid.tileRefAt(x, y);
-				tile.* = .dirt;
+				try grid.setTile(x, y, .dirt);
 			}
 		}
 	}

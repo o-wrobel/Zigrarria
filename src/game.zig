@@ -12,10 +12,6 @@ const Bitmap = []u4;
 
 const camera_move_speed = 660;
 
-var WINDOW_WIDTH: i32 = 1400;
-var WINDOW_HEIGHT: i32 = 800;
-
-
 pub const Config = struct {
 	window_width: i32,
 	window_height: i32,
@@ -37,8 +33,8 @@ const State = struct {
 			.grid = try level.getRandomLevel(world_config, allocator),
 			.camera = .{
 				.offset = .init(
-					@divFloor(@as(f32, @floatFromInt(WINDOW_WIDTH)),2),
-					@divFloor(@as(f32, @floatFromInt(WINDOW_HEIGHT)),2),
+					@divFloor(@as(f32, @floatFromInt(rl.getScreenWidth())),2),
+					@divFloor(@as(f32, @floatFromInt(rl.getScreenHeight())),2),
 				),
 				.rotation = 0,
 				.target = .init(0, 0),
@@ -84,7 +80,7 @@ fn handleTilePlacing(state: *State) !bool {
 		const mouse_grid_position = level.getMouseGridPosition(&state.grid, state.camera);
 		const x: u64 = @intFromFloat(mouse_grid_position.x);
 		const y: u64 = @intFromFloat(mouse_grid_position.y);
-		try state.grid.placeTile(x, y, .dirt);
+		try state.grid.setTile(x, y, .dirt);
 		return true;
 	}
 	return false;
@@ -143,12 +139,10 @@ pub fn runGameLoop(allocator: std.mem.Allocator) !void {
 
 pub fn run(config: ?Config) !void { // TODO: Maybe clean this up
 	const c = config orelse Config{
-		.window_width = 1400,
-		.window_height = 800
-	};
-	WINDOW_WIDTH = c.window_width;
-	WINDOW_HEIGHT= c.window_height;
-	rl.initWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "Hello, world!");
+		.window_width = 1480,
+		.window_height = 720
+	}; //Must be multiple of 8 (TILE_SIZE)
+	rl.initWindow(c.window_width, c.window_height, "Hello, world!");
 	defer rl.closeWindow();
 	if (!rl.isWindowReady()) return error.InitWindow;
 

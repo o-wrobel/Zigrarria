@@ -129,7 +129,7 @@ pub fn drawGrid(grid: *const Grid, bitmap: Bitmap, bitmap_was_modified: bool, ca
 	};
 
 	if (bitmap_was_modified) {
-		for (ye..y0) |y| { // IMPORANT: Goes from bottom to top
+		for (ye..y0+1) |y| { // IMPORANT: Goes from bottom to top
 			for (x0..xe+1) |x| { // Left to right
 				const yf: f32 = @floatFromInt(y);
 				const xf: f32 = @floatFromInt(x);
@@ -140,7 +140,7 @@ pub fn drawGrid(grid: *const Grid, bitmap: Bitmap, bitmap_was_modified: bool, ca
 			}
 		}
 	} else {
-		for (ye..y0) |y| { // IMPORANT: Goes from bottom to top
+		for (ye..y0+1) |y| { // IMPORANT: Goes from bottom to top
 			for (x0..xe+1) |x| { // Left to right
 				const yf: f32 = @floatFromInt(y);
 				const xf: f32 = @floatFromInt(x);
