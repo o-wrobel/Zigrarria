@@ -41,6 +41,7 @@ const Facing = packed struct {
 
 // GRID DRAWING
 pub fn checkNeighborsAt(grid: *const Grid, x: u64, y: u64) !Facing {
+	const tile = try grid.tileAt(x, y);
 	if (x == 0 or x == grid.width-1 or y == 0 or y == grid.height-1) return .{
 		.r = false,
 		.b = false,
@@ -48,10 +49,18 @@ pub fn checkNeighborsAt(grid: *const Grid, x: u64, y: u64) !Facing {
 		.t = false
 	};
 	return .{
-		.r = try grid.tileAt(x + 1, y) == .dirt,
-		.l = try grid.tileAt(x - 1, y) == .dirt,
-		.t = try grid.tileAt(x, y + 1) == .dirt,
-		.b = try grid.tileAt(x, y - 1) == .dirt,
+		.r = try grid.tileAt(x + 1, y) == tile,
+		.l = try grid.tileAt(x - 1, y) == tile,
+		.t = try grid.tileAt(x, y + 1) == tile,
+		.b = try grid.tileAt(x, y - 1) == tile,
+	};
+}
+
+fn getTileTextureYIndex(tile: Grid.Tile) u64 {
+	return switch (tile) {
+		.none => 0,
+		.dirt => TILE_SIZE,
+		.stone => 2*TILE_SIZE
 	};
 }
 
@@ -65,14 +74,7 @@ fn getTextureRect(grid: *const Grid, bitmap: Bitmap, x: u64, y: u64) !rl.Rectang
 
 	const tile = try grid.tileAt(x, y);
 
-	switch (tile) {
-		.none => {
-			source_rect.y = 0;
-		},
-		else => {
-			source_rect.y = TILE_SIZE;
-		}
-	}
+	source_rect.y = @floatFromInt(getTileTextureYIndex(tile));
 
 	const grid_index = x + y*grid.width;
 	// const x_index = (try checkNeighborsAt(grid, x, y)).toInt();
@@ -90,17 +92,9 @@ fn getTextureRectModifiedBitmap(grid: *const Grid, bitmap: Bitmap, x: u64, y: u6
 	};
 
 	const tile = try grid.tileAt(x, y);
+	source_rect.y = @floatFromInt(getTileTextureYIndex(tile));
 
-	switch (tile) {
-		.none => {
-			source_rect.y = 0;
-		},
-		else => {
-			source_rect.y = TILE_SIZE;
-		}
-	}
-
-	const grid_index = x + y*grid.width;
+	const grid_index = grid.getIndex(x, y);
 	// const x_index = (try checkNeighborsAt(grid, x, y)).toInt();
 	bitmap[grid_index] = (try checkNeighborsAt(grid, x, y)).toInt();
 	const x_index = bitmap[grid_index];

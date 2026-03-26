@@ -1,7 +1,7 @@
 const std = @import("std");
 pub const Grid = @This();
 
-const Tile = enum {
+pub const Tile = enum {
 	none,
 	dirt,
 	stone,

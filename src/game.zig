@@ -81,7 +81,7 @@ fn handleTilePlacing(state: *State) !bool {
 		const mouse_grid_position = level.getMouseGridPosition(&state.grid, state.camera);
 		const x: u64 = @intFromFloat(mouse_grid_position.x);
 		const y: u64 = @intFromFloat(mouse_grid_position.y);
-		try state.grid.setTile(x, y, .dirt);
+		try state.grid.setTile(x, y, .stone);
 		return true;
 	}
 	return false;
@@ -122,7 +122,7 @@ pub fn runGameLoop(allocator: std.mem.Allocator) !void {
 		.height = 64,
 	};
 	var state = try State.init(world_config, allocator);
-	const spritesheet = try rl.loadTexture("assets/dirt.png");
+	const spritesheet = try rl.loadTexture("assets/tiles.png");
 
 	const path: [:0]const u8 = "assets/my_shader.frag\x00";
 	const shader = try rl.loadShader(null, path);
