@@ -27,6 +27,7 @@ const State = struct {
 	grid: level.Grid,
 	camera: rl.Camera2D,
 	modified_world: bool = true,
+	make_scary: bool = false,
 
 	pub fn init(world_config: level.WorldConfig, allocator: std.mem.Allocator)  !State {
 		return .{
@@ -88,20 +89,27 @@ fn handleTilePlacing(state: *State) !bool {
 
 fn updateGameplay(state: *State, delta_time: f32) !void {
 	state.modified_world = try handleTilePlacing(state);
+	if (rl.isKeyPressed(.x)) state.make_scary = true;
 
 	updateCamera(&state.camera, delta_time);
 }
 
-fn drawGameplay(state: *State, bitmap: Bitmap, spritesheet: rl.Texture2D) !void {
+fn drawGameplay(state: *State, bitmap: Bitmap, spritesheet: rl.Texture2D, shader: rl.Shader) !void {
 	// Drawing
 	rl.beginDrawing();
 	defer rl.endDrawing();
 
 	rl.clearBackground(.sky_blue);
+	if (state.make_scary) {
+		rl.beginShaderMode(shader);
+		rl.clearBackground(.black);
+	}
+
 	rl.beginMode2D(state.camera);
 
 	try level.drawGrid(&state.grid, bitmap, state.modified_world, state.camera, spritesheet);
 	rl.endMode2D();
+	rl.endShaderMode();
 
 	// Fixed Drawing
 	try printInfo(state);
@@ -116,6 +124,12 @@ pub fn runGameLoop(allocator: std.mem.Allocator) !void {
 	var state = try State.init(world_config, allocator);
 	const spritesheet = try rl.loadTexture("assets/dirt.png");
 
+	const path: [:0]const u8 = "assets/my_shader.frag\x00";
+	const shader = try rl.loadShader(null, path);
+	const loc = rl.getShaderLocation(shader, "coolColor\x00");
+	const color: [3]f32 = .{0.8, 0.2, 0.2};
+	rl.setShaderValue(shader, loc, &color, .vec3);
+
 	const bitmap = try allocator.alloc(u4, state.grid.width*state.grid.height);
 	defer allocator.free(bitmap);
 
@@ -124,7 +138,7 @@ pub fn runGameLoop(allocator: std.mem.Allocator) !void {
 		switch (state.gamemode) {
 			.gameplay => {
 				try updateGameplay(&state, delta_time);
-				try drawGameplay(&state, bitmap, spritesheet);
+				try drawGameplay(&state, bitmap, spritesheet, shader);
 			},
 			.title_screen => {
 				try updateGameplay(&state, delta_time);
