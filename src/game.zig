@@ -45,6 +45,60 @@ const State = struct {
 	}
 };
 
+const Vignette = struct {
+	radius1: f32,
+	radius2: f32
+};
+
+
+const RenderState = struct {
+	target: rl.RenderTexture2D,
+	bitmap: Bitmap,
+	shader: rl.Shader,
+	spritesheet: rl.Texture2D,
+	vignette: Vignette,
+
+	pub fn init(state: State, allocator: std.mem.Allocator) !RenderState {
+		const spritesheet = try rl.loadTexture("assets/tiles.png");
+		const bitmap = try allocator.alloc(u4, state.grid.width*state.grid.height);
+		const target = try rl.loadRenderTexture(rl.getScreenWidth(), rl.getScreenHeight());
+
+		const vignette: Vignette = .{
+			.radius1 = 0,
+			.radius2 = 1.5
+		};
+
+		const path: [:0]const u8 = "assets/my_shader.frag\x00";
+		const shader = try rl.loadShader(null, path);
+		{
+			const loc = rl.getShaderLocation(shader, "radius1\x00");
+			rl.setShaderValue(shader, loc, &vignette.radius1, .float);
+		}
+		{
+			const loc = rl.getShaderLocation(shader, "radius2\x00");
+			rl.setShaderValue(shader, loc, &vignette.radius2, .float);
+		}
+		{
+			const loc = rl.getShaderLocation(shader, "coolColor\x00");
+			const color: [3]f32 = .{0.8, 0.2, 0.2};
+			rl.setShaderValue(shader, loc, &color, .vec3);
+		}
+		{
+			const loc = rl.getShaderLocation(shader, "res\x00");
+			const res: [2]f32 = .{@floatFromInt(rl.getScreenWidth()), @floatFromInt(rl.getScreenHeight())};
+			rl.setShaderValue(shader, loc, &res, .vec2);
+		}
+
+		return .{
+			.spritesheet = spritesheet,
+			.shader = shader,
+			.bitmap = bitmap,
+			.vignette = vignette,
+			.target = target
+		};
+	}
+};
+
 fn printInfo(state: *const State) !void {
 	const mouse_grid_position = level.getMouseGridPosition(&state.grid, state.camera);
 	var buffer: [128]u8 = undefined;
@@ -94,26 +148,35 @@ fn updateGameplay(state: *State, delta_time: f32) !void {
 	updateCamera(&state.camera, delta_time);
 }
 
-fn drawGameplay(state: *State, bitmap: Bitmap, spritesheet: rl.Texture2D, shader: rl.Shader) !void {
+fn drawGameplay(state: *State, render: *RenderState) !void {
 	// Drawing
+	rl.beginTextureMode(render.target);
+		rl.clearBackground(.sky_blue);
+
+		rl.beginMode2D(state.camera);
+
+		try level.drawGrid(&state.grid, render.bitmap, state.modified_world, state.camera, render.spritesheet);
+		rl.endMode2D();
+		rl.endShaderMode();
+
+		// Fixed Drawing
+		try printInfo(state);
+		rl.drawFPS(10, 100);
+	rl.endTextureMode();
+
 	rl.beginDrawing();
-	defer rl.endDrawing();
-
-	rl.clearBackground(.sky_blue);
-	if (state.make_scary) {
-		rl.beginShaderMode(shader);
 		rl.clearBackground(.black);
-	}
+		if (state.make_scary) rl.beginShaderMode(render.shader);
 
-	rl.beginMode2D(state.camera);
+		rl.drawTextureRec(
+			render.target.texture,
+			.init(0, 0, @floatFromInt(rl.getScreenWidth()), @floatFromInt(-1 * rl.getScreenHeight())),
+			.init(0, 0),
+			.white
+		);
+		rl.endShaderMode();
+	rl.endDrawing();
 
-	try level.drawGrid(&state.grid, bitmap, state.modified_world, state.camera, spritesheet);
-	rl.endMode2D();
-	rl.endShaderMode();
-
-	// Fixed Drawing
-	try printInfo(state);
-	rl.drawFPS(10, 100);
 }
 
 pub fn runGameLoop(allocator: std.mem.Allocator) !void {
@@ -122,23 +185,15 @@ pub fn runGameLoop(allocator: std.mem.Allocator) !void {
 		.height = 64,
 	};
 	var state = try State.init(world_config, allocator);
-	const spritesheet = try rl.loadTexture("assets/tiles.png");
 
-	const path: [:0]const u8 = "assets/my_shader.frag\x00";
-	const shader = try rl.loadShader(null, path);
-	const loc = rl.getShaderLocation(shader, "coolColor\x00");
-	const color: [3]f32 = .{0.8, 0.2, 0.2};
-	rl.setShaderValue(shader, loc, &color, .vec3);
-
-	const bitmap = try allocator.alloc(u4, state.grid.width*state.grid.height);
-	defer allocator.free(bitmap);
+	var render: RenderState = try .init(state, allocator);
 
 	while (!rl.windowShouldClose()) {
 		const delta_time = rl.getFrameTime();
 		switch (state.gamemode) {
 			.gameplay => {
 				try updateGameplay(&state, delta_time);
-				try drawGameplay(&state, bitmap, spritesheet, shader);
+				try drawGameplay(&state, &render);
 			},
 			.title_screen => {
 				try updateGameplay(&state, delta_time);
