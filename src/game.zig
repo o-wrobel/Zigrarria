@@ -7,96 +7,15 @@ const znoise = @import("znoise");
 const helper = @import("helper.zig");
 const title_screen = @import("title_screen.zig");
 const level = @import("level.zig");
+const State = @import("State.zig");
+const RenderState = @import("render.zig").State;
 const Grid = level.Grid;
-const Bitmap = []u4;
 
 const camera_move_speed = 660;
 
 pub const Config = struct {
 	window_width: i32,
 	window_height: i32,
-};
-
-const GameMode = enum {
-	title_screen,
-	gameplay
-};
-
-const State = struct {
-	gamemode: GameMode = .title_screen,
-	grid: level.Grid,
-	camera: rl.Camera2D,
-	modified_world: bool = true,
-	make_scary: bool = false,
-
-	pub fn init(world_config: level.WorldConfig, allocator: std.mem.Allocator)  !State {
-		return .{
-			.grid = try level.getRandomLevel(world_config, allocator),
-			.camera = .{
-				.offset = .init(
-					@divFloor(@as(f32, @floatFromInt(rl.getScreenWidth())),2),
-					@divFloor(@as(f32, @floatFromInt(rl.getScreenHeight())),2),
-				),
-				.rotation = 0,
-				.target = .init(0, 0),
-				.zoom = 1
-			},
-		};
-	}
-};
-
-const Vignette = struct {
-	radius1: f32,
-	radius2: f32
-};
-
-
-const RenderState = struct {
-	target: rl.RenderTexture2D,
-	bitmap: Bitmap,
-	shader: rl.Shader,
-	spritesheet: rl.Texture2D,
-	vignette: Vignette,
-
-	pub fn init(state: State, allocator: std.mem.Allocator) !RenderState {
-		const spritesheet = try rl.loadTexture("assets/tiles.png");
-		const bitmap = try allocator.alloc(u4, state.grid.width*state.grid.height);
-		const target = try rl.loadRenderTexture(rl.getScreenWidth(), rl.getScreenHeight());
-
-		const vignette: Vignette = .{
-			.radius1 = 0,
-			.radius2 = 1.5
-		};
-
-		const path: [:0]const u8 = "assets/my_shader.frag\x00";
-		const shader = try rl.loadShader(null, path);
-		{
-			const loc = rl.getShaderLocation(shader, "radius1\x00");
-			rl.setShaderValue(shader, loc, &vignette.radius1, .float);
-		}
-		{
-			const loc = rl.getShaderLocation(shader, "radius2\x00");
-			rl.setShaderValue(shader, loc, &vignette.radius2, .float);
-		}
-		{
-			const loc = rl.getShaderLocation(shader, "coolColor\x00");
-			const color: [3]f32 = .{0.8, 0.2, 0.2};
-			rl.setShaderValue(shader, loc, &color, .vec3);
-		}
-		{
-			const loc = rl.getShaderLocation(shader, "res\x00");
-			const res: [2]f32 = .{@floatFromInt(rl.getScreenWidth()), @floatFromInt(rl.getScreenHeight())};
-			rl.setShaderValue(shader, loc, &res, .vec2);
-		}
-
-		return .{
-			.spritesheet = spritesheet,
-			.shader = shader,
-			.bitmap = bitmap,
-			.vignette = vignette,
-			.target = target
-		};
-	}
 };
 
 fn printInfo(state: *const State) !void {
@@ -176,7 +95,6 @@ fn drawGameplay(state: *State, render: *RenderState) !void {
 		);
 		rl.endShaderMode();
 	rl.endDrawing();
-
 }
 
 pub fn runGameLoop(allocator: std.mem.Allocator) !void {
@@ -186,7 +104,7 @@ pub fn runGameLoop(allocator: std.mem.Allocator) !void {
 	};
 	var state = try State.init(world_config, allocator);
 
-	var render: RenderState = try .init(state, allocator);
+	var render: RenderState = try .init(allocator);
 
 	while (!rl.windowShouldClose()) {
 		const delta_time = rl.getFrameTime();
