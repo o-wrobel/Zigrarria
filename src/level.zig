@@ -2,7 +2,6 @@ const std = @import("std");
 const rl = @import("raylib");
 const znoise = @import("znoise");
 
-const helper = @import("helper.zig");
 const tgen = @import("terrain_generation.zig");
 pub const Grid = @import("Grid.zig");
 const Bitmap = []u4;
@@ -38,6 +37,21 @@ const Facing = packed struct {
 
 	}
 };
+
+// Helper function
+pub fn getCameraBounds(camera: rl.Camera2D) struct{rl.Vector2, rl.Vector2} {
+	const top_left = rl.getScreenToWorld2D(.init(0, 0), camera);
+	const bottom_right = rl.getScreenToWorld2D(
+		.init(
+			@floatFromInt(rl.getScreenWidth()),
+			@floatFromInt(rl.getScreenHeight())
+		),
+		camera
+	);
+
+	// std.debug.print("{}, {} ||| {}, {}\n", .{top_left.x, top_left.y, bottom_right.x, bottom_right.y});
+	return .{top_left, bottom_right};
+}
 
 // GRID DRAWING
 pub fn checkNeighborsAt(grid: *const Grid, x: u64, y: u64) !Facing {
@@ -157,7 +171,7 @@ pub fn getMouseGridPosition(grid: *const Grid, camera: rl.Camera2D) rl.Vector2 {
 }
 
 fn getCameraGridBounds(camera: rl.Camera2D, grid: *const Grid) struct{rl.Vector2, rl.Vector2} {
-	const bounds = helper.getCameraBounds(camera);
+	const bounds = getCameraBounds(camera);
 	const top_left = getGridPosition(grid, bounds[0]);
 	const bottom_right = getGridPosition(grid, bounds[1]); //TODO: handle inverted coordinates
 

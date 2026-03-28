@@ -4,11 +4,12 @@ const rl = @import("raylib");
 const rgui = @import("raygui");
 const znoise = @import("znoise");
 
-const helper = @import("helper.zig");
 const title_screen = @import("title_screen.zig");
 const level = @import("level.zig");
+const rdr = @import("render.zig");
 const State = @import("State.zig");
-const RenderState = @import("render.zig").State;
+
+const RenderState = rdr.RenderState;
 const Grid = level.Grid;
 
 const camera_move_speed = 660;
@@ -17,27 +18,6 @@ pub const Config = struct {
 	window_width: i32,
 	window_height: i32,
 };
-
-fn printInfo(state: *const State) !void {
-	const mouse_grid_position = level.getMouseGridPosition(&state.grid, state.camera);
-	var buffer: [128]u8 = undefined;
-	const string = try std.fmt.bufPrintZ(
-		&buffer,
-		"{s}, {}, {}",
-		.{
-			@tagName(
-				state.grid.tileAt(
-					@intFromFloat(mouse_grid_position.x),
-					@intFromFloat(mouse_grid_position.y)
-				) catch .none
-			),
-			mouse_grid_position.x,
-			mouse_grid_position.y,
-		}
-	);
-	const rect: rl.Rectangle = .init(10, 10, 100, 20);
-	_=rgui.statusBar(rect, string);
-}
 
 fn updateCamera(camera: *rl.Camera2D, delta_time: f32) void {
 	if (rl.isKeyDown(.a)) camera.target.x -= camera_move_speed*delta_time;
@@ -67,36 +47,6 @@ fn updateGameplay(state: *State, delta_time: f32) !void {
 	updateCamera(&state.camera, delta_time);
 }
 
-fn drawGameplay(state: *State, render: *RenderState) !void {
-	// Drawing
-	rl.beginTextureMode(render.target);
-		rl.clearBackground(.sky_blue);
-
-		rl.beginMode2D(state.camera);
-
-		try level.drawGrid(&state.grid, render.bitmap, state.modified_world, state.camera, render.spritesheet);
-		rl.endMode2D();
-		rl.endShaderMode();
-
-		// Fixed Drawing
-		try printInfo(state);
-		rl.drawFPS(10, 100);
-	rl.endTextureMode();
-
-	rl.beginDrawing();
-		rl.clearBackground(.black);
-		if (state.make_scary) rl.beginShaderMode(render.shader);
-
-		rl.drawTextureRec(
-			render.target.texture,
-			.init(0, 0, @floatFromInt(rl.getScreenWidth()), @floatFromInt(-1 * rl.getScreenHeight())),
-			.init(0, 0),
-			.white
-		);
-		rl.endShaderMode();
-	rl.endDrawing();
-}
-
 pub fn runGameLoop(allocator: std.mem.Allocator) !void {
 	const world_config: level.WorldConfig = .{
 		.width = 300,
@@ -104,14 +54,14 @@ pub fn runGameLoop(allocator: std.mem.Allocator) !void {
 	};
 	var state = try State.init(world_config, allocator);
 
-	var render: RenderState = try .init(allocator);
+	var render_state: RenderState = try .init(allocator);
 
 	while (!rl.windowShouldClose()) {
 		const delta_time = rl.getFrameTime();
 		switch (state.gamemode) {
 			.gameplay => {
 				try updateGameplay(&state, delta_time);
-				try drawGameplay(&state, &render);
+				try rdr.render(&state, &render_state);
 			},
 			.title_screen => {
 				try updateGameplay(&state, delta_time);

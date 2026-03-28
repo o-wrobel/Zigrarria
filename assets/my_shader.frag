@@ -4,6 +4,7 @@ in vec2 fragTexCoord;
 
 uniform float radius1;
 uniform float radius2;
+uniform vec2 center = vec2(1, 0);
 uniform vec3 coolColor;
 
 uniform vec2 res;
@@ -26,7 +27,8 @@ void main() {
 	vec4 texelColor = texture(texture0, fragTexCoord);
 	vec3 my_color = coolColor;
 
-	float dist = length(uv);
+	float dist = distance(center, uv);
+	// float dist = length(uv);
 
 	float vignette_radius1 = 0.;
 	float vignette_radius2 = 1.8;
