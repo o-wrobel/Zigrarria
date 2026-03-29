@@ -6,10 +6,12 @@ const State = @import("State.zig");
 
 const Bitmap = []u4;
 
-const Vignette = struct {
-	radius1: f32,
-	radius2: f32
-};
+fn setShaderUniform(shader: rl.Shader, value: *const anyopaque, name: []const u8, value_type: rl.ShaderUniformDataType) !void {
+	var buffer: [128]u8 = undefined;
+	const string = try std.fmt.bufPrintZ(&buffer, "{s}", .{name});
+	const loc = rl.getShaderLocation(shader, string);
+	rl.setShaderValue(shader, loc, value, value_type);
+}
 
 pub const RenderState = struct {
 	target: rl.RenderTexture2D,
@@ -17,6 +19,11 @@ pub const RenderState = struct {
 	shader: rl.Shader,
 	spritesheet: rl.Texture2D,
 	vignette: Vignette,
+
+	const Vignette = struct {
+		radius1: f32,
+		radius2: f32
+	};
 
 	pub fn init(allocator: std.mem.Allocator) !RenderState {
 		const spritesheet = try rl.loadTexture("assets/tiles.png");
@@ -28,26 +35,16 @@ pub const RenderState = struct {
 			.radius2 = 1.5
 		};
 
-		const path: [:0]const u8 = "assets/my_shader.frag\x00";
+		const path: [:0]const u8 = "assets/scary_vignette.frag\x00";
 		const shader = try rl.loadShader(null, path);
-		{
-			const loc = rl.getShaderLocation(shader, "radius1\x00");
-			rl.setShaderValue(shader, loc, &vignette.radius1, .float);
-		}
-		{
-			const loc = rl.getShaderLocation(shader, "radius2\x00");
-			rl.setShaderValue(shader, loc, &vignette.radius2, .float);
-		}
-		{
-			const loc = rl.getShaderLocation(shader, "coolColor\x00");
-			const color: [3]f32 = .{0.8, 0.2, 0.2};
-			rl.setShaderValue(shader, loc, &color, .vec3);
-		}
-		{
-			const loc = rl.getShaderLocation(shader, "res\x00");
-			const res: [2]f32 = .{@floatFromInt(rl.getScreenWidth()), @floatFromInt(rl.getScreenHeight())};
-			rl.setShaderValue(shader, loc, &res, .vec2);
-		}
+
+		const color: [3]f32 = .{0.8, 0.2, 0.2};
+		try setShaderUniform(shader, &color, "coolColor", .vec3);
+		try setShaderUniform(shader, &vignette.radius1, "radius1", .float);
+		try setShaderUniform(shader, &vignette.radius2, "radius2", .float);
+
+		const res: [2]f32 = .{@floatFromInt(rl.getScreenWidth()), @floatFromInt(rl.getScreenHeight())};
+		try setShaderUniform(shader, &res, "resolution", .vec2);
 
 		return .{
 			.spritesheet = spritesheet,
@@ -92,12 +89,10 @@ fn printInfo(state: *const State) !void {
 
 pub fn render(state: *State, render_state: *RenderState) !void {
 	// Update shader
-	{
-		const center = getOpenGLPosition(rl.getMousePosition());
-		const loc = rl.getShaderLocation(render_state.shader, "center\x00");
-		const vals: [2]f32 = .{center.x, center.y};
-		rl.setShaderValue(render_state.shader, loc, &vals, .vec2);
-	}
+	const center = getOpenGLPosition(rl.getMousePosition());
+	const vals: [2]f32 = .{center.x, center.y};
+	try setShaderUniform(render_state.shader, &vals, "center", .vec2);
+
 	// World
 	rl.beginTextureMode(render_state.target);
 		rl.clearBackground(.sky_blue);
