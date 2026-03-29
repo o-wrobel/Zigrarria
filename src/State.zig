@@ -12,8 +12,7 @@ pub const GameMode = enum {
 gamemode: GameMode = .title_screen,
 grid: level.Grid,
 camera: rl.Camera2D,
-modified_world: bool = true,
-make_scary: bool = false,
+shader_index: u8 = 0,
 
 pub fn init(world_config: level.WorldConfig, allocator: std.mem.Allocator)  !State {
 	return .{

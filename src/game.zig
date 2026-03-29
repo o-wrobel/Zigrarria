@@ -40,9 +40,15 @@ fn handleTilePlacing(state: *State) !bool {
 	return false;
 }
 
-fn updateGameplay(state: *State, delta_time: f32) !void {
-	state.modified_world = try handleTilePlacing(state);
-	if (rl.isKeyPressed(.x)) state.make_scary = true;
+fn updateGameplay(state: *State, render_state: *RenderState, delta_time: f32) !void {
+	render_state.modified_world = try handleTilePlacing(state);
+	if (rl.isKeyPressed(.x)) {
+		if (state.shader_index != 0) {
+			state.shader_index = 0;
+		} else {
+			state.shader_index = 1;
+		}
+	}
 
 	updateCamera(&state.camera, delta_time);
 }
@@ -60,11 +66,11 @@ pub fn runGameLoop(allocator: std.mem.Allocator) !void {
 		const delta_time = rl.getFrameTime();
 		switch (state.gamemode) {
 			.gameplay => {
-				try updateGameplay(&state, delta_time);
+				try updateGameplay(&state, &render_state, delta_time);
 				try rdr.render(&state, &render_state);
 			},
 			.title_screen => {
-				try updateGameplay(&state, delta_time);
+				try updateGameplay(&state, &render_state, delta_time);
 				if (title_screen.draw()) { //TODO: FIgure out how to somehow separate the logic from drawing
 					state.gamemode = .gameplay;
 				}
