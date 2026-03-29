@@ -17,13 +17,9 @@ pub const RenderState = struct {
 	target: rl.RenderTexture2D,
 	bitmap: Bitmap,
 	modified_world: bool = true,
-	shader: rl.Shader,
+	vignette_shader: rl.Shader,
+	distortion_shader: rl.Shader,
 	spritesheet: rl.Texture2D,
-	vignette: struct {
-		radius1: f32,
-		radius2: f32
-	}
-,
 
 	pub fn init(allocator: std.mem.Allocator) !RenderState {
 		const spritesheet = try rl.loadTexture("assets/tiles.png");
@@ -31,26 +27,31 @@ pub const RenderState = struct {
 		const target = try rl.loadRenderTexture(rl.getScreenWidth(), rl.getScreenHeight());
 
 		const path: [:0]const u8 = "assets/scary_vignette.frag\x00";
-		const shader = try rl.loadShader(null, path);
+		const vignette_shader = try rl.loadShader(null, path);
+
+		const distortion_shader = try rl.loadShader(null, "assets/distortion.frag\x00");
 
 		const state: RenderState = .{
 			.spritesheet = spritesheet,
-			.shader = shader,
+			.vignette_shader = vignette_shader,
+			.distortion_shader = distortion_shader,
 			.bitmap = bitmap,
-			.vignette = .{
-				.radius1 = 0.1,
-				.radius2 = 0.8
-			},
 			.target = target
 		};
+		rl.setTextureWrap(state.target.texture, .clamp);
 
+		// Vignette Shader
 		const color: [3]f32 = .{0.8, 0.2, 0.2};
-		try setShaderUniform(shader, &color, "coolColor", .vec3);
-		try setShaderUniform(shader, &state.vignette.radius1, "radius1", .float);
-		try setShaderUniform(shader, &state.vignette.radius2, "radius2", .float);
+		const radii: [2]f32 = .{0.1, 0.8};
+		try setShaderUniform(vignette_shader, &color, "coolColor", .vec3);
+		try setShaderUniform(vignette_shader, &radii[0], "radius1", .float);
+		try setShaderUniform(vignette_shader, &radii[1], "radius2", .float);
 
 		const res: [2]f32 = .{@floatFromInt(rl.getScreenWidth()), @floatFromInt(rl.getScreenHeight())};
-		try setShaderUniform(shader, &res, "resolution", .vec2);
+		try setShaderUniform(vignette_shader, &res, "resolution", .vec2);
+
+		// Distortion Shader
+		try setShaderUniform(distortion_shader, &res, "resolution", .vec2);
 
 		return state;
 	}
@@ -91,7 +92,7 @@ pub fn render(state: *const State, render_state: *RenderState) !void {
 	// Update shader
 	const center = getOpenGLPosition(rl.getMousePosition());
 	const vals: [2]f32 = .{center.x, center.y};
-	try setShaderUniform(render_state.shader, &vals, "center", .vec2);
+	try setShaderUniform(render_state.vignette_shader, &vals, "center", .vec2);
 
 	// World
 	rl.beginTextureMode(render_state.target);
@@ -106,7 +107,8 @@ pub fn render(state: *const State, render_state: *RenderState) !void {
 	// Drawing
 	rl.beginDrawing();
 		rl.clearBackground(.black);
-		if (state.shader_index == 1) rl.beginShaderMode(render_state.shader);
+		if (state.shader_index == 1) rl.beginShaderMode(render_state.vignette_shader);
+		if (state.shader_index == 2) rl.beginShaderMode(render_state.distortion_shader);
 
 		rl.drawTextureRec(
 			render_state.target.texture,

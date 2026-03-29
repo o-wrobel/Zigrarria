@@ -49,6 +49,9 @@ fn updateGameplay(state: *State, render_state: *RenderState, delta_time: f32) !v
 			state.shader_index = 1;
 		}
 	}
+	if (rl.isKeyPressed(.z)) {
+		state.shader_index = 2;
+	}
 
 	updateCamera(&state.camera, delta_time);
 }
