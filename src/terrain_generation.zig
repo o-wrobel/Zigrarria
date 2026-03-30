@@ -4,14 +4,15 @@ const znoise = @import("znoise");
 const Grid = @import("Grid.zig");
 
 fn terrainHeight(x: u64, gen: znoise.FnlGenerator) u64 {
-	const frequency: f32 = 0.65;
+	const frequency: f32 = 0.85;
 	const amplitude: f32 = 20;
 	const base_height: f32 = 45;
 
-	const n = gen.noise2(
+	var n = gen.noise2(
 		@as(f32, @floatFromInt(x))*frequency,
 		0
 	);
+	n *= n/10 + 1;
 	return @intFromFloat(base_height + amplitude * n);
 }
 

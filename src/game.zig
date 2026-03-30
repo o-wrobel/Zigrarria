@@ -57,10 +57,7 @@ fn updateGameplay(state: *State, render_state: *RenderState, delta_time: f32) !v
 }
 
 pub fn runGameLoop(allocator: std.mem.Allocator) !void {
-	const world_config: level.WorldConfig = .{
-		.width = 300,
-		.height = 64,
-	};
+	const world_config = level.WorldConfig.test_config;
 	var state = try State.init(world_config, allocator);
 
 	var render_state: RenderState = try .init(allocator);

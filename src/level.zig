@@ -12,8 +12,15 @@ const TILE_TEXTURE_SIZE = 9*2;
 pub const WorldConfig = struct {
 	seed: ?u64 = null,
 	width: u64,
-	height: u64
+	height: u64,
+
+	pub const test_config: WorldConfig = .{
+    	.width = 800,
+		.height = 80,
+		.seed = null
+	};
 };
+
 
 const Face = enum (u8) {
 	r = 1,
